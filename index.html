@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Timezone Dashboard</title>
+<style>
+  :root{
+    --bg:#0f1114;
+    --card:#171a1f;
+    --grid:#14171c;
+    --border:#232834;
+    --muted:#9aa3ad;
+    --text:#ffffff;
+    --accent:#7fb8ff;
+    --pill:#1f2a3a;
+    --glow: rgba(127,184,255,.25);
+  }
+  html,body{height:100%}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family: "Aptos","Segoe UI","Inter","Helvetica Neue", Arial, system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing:antialiased;
+    line-height:1.25;
+  }
+  .wrap{max-width:1280px; margin:28px auto 96px; padding:0 24px;}
+  header h1{
+    margin:0 0 6px;
+    font-size:28px;
+    font-weight:700;
+    letter-spacing:.2px;
+  }
+  header .sub{
+    margin:0 0 20px;
+    color:var(--muted);
+    font-size:13px;
+  }
+
+  /* CARD STRIP */
+  .cards{
+    display:grid;
+    grid-template-columns: repeat(6, minmax(180px,1fr));
+    gap:18px;
+  }
+  @media (max-width:1100px){
+    .cards{ grid-template-columns: repeat(3, minmax(200px,1fr)); }
+  }
+  @media (max-width:720px){
+    .cards{ grid-template-columns: repeat(2, minmax(200px,1fr)); }
+  }
+  .card{
+    position:relative;
+    background:var(--card);
+    border-radius:18px;
+    overflow:hidden;
+    box-shadow: 0 10px 24px rgba(0,0,0,.35);
+  }
+  .card .art{
+    position:absolute; inset:0;
+    background-size:cover;
+    background-position:center;
+    filter:brightness(.55) contrast(1.05);
+    transform:scale(1.02);
+  }
+  .card .shade{
+    position:absolute; inset:0;
+    background: radial-gradient(120% 120% at 50% 10%, rgba(0,0,0,.10), rgba(0,0,0,.55));
+  }
+  .card .in{
+    position:relative; z-index:1;
+    padding:18px 18px 16px;
+    display:flex; flex-direction:column; gap:8px; min-height:204px;
+  }
+  .city{
+    font-size:20px; font-weight:800; letter-spacing:.2px; text-shadow:0 1px 0 rgba(0,0,0,.25);
+  }
+  .big{
+    display:flex; align-items:baseline; gap:10px;
+  }
+  .time{
+    font-size:46px; font-weight:900; letter-spacing:.6px; line-height:1;
+  }
+  .ampm{
+    font-size:20px; font-weight:800; text-transform:lowercase; opacity:.95; margin-top:6px;
+  }
+  .offset, .date{
+    font-size:13px; color:#e7edf7; opacity:.9;
+  }
+  .date{ color:var(--muted); }
+
+  /* LEGEND */
+  .legend{display:flex; align-items:center; gap:18px; margin:14px 2px 8px}
+  .dot{width:8px;height:8px;border-radius:50%}
+  .day{ background: #ffd66e;}
+  .night{ background: #8aa0c9;}
+
+  /* GRID */
+  .grid{
+    margin-top:10px;
+    background:var(--grid);
+    border:1px solid var(--border);
+    border-radius:14px;
+    overflow:hidden;
+  }
+  .row{ display:grid; grid-template-columns: 220px repeat(13, minmax(92px,1fr)); }
+  .head{ background: #0e1217; border-bottom:1px solid var(--border); position:relative; }
+  .cell{
+    padding:12px 10px;
+    border-left:1px solid var(--border);
+    display:flex; align-items:center; justify-content:center;
+    gap:8px; white-space:nowrap; font-size:14px; color:#e6eefc;
+  }
+  .cell:first-child{ border-left:0; justify-content:flex-start; color:#cbd6e2; gap:10px; }
+  .row + .row .cell{ border-top:1px solid var(--border); }
+  .label{
+    display:flex; align-items:center; gap:10px;
+    padding-left:14px; font-weight:600; color:#f3f7ff;
+  }
+  .lbl-icon{
+    width:18px; height:18px; border-radius:50%; background:#2a3141;
+    display:grid; place-items:center; color:#9ab3ff; font-size:11px;
+  }
+
+  /* Highlight column (Windows-like) */
+  .col-highlight{
+    position:absolute; top:0; bottom:0; width:var(--colW, 100px);
+    border-radius:10px;
+    background: linear-gradient(to bottom, rgba(127,184,255,.08), rgba(127,184,255,.16));
+    box-shadow: 0 0 0 1px rgba(127,184,255,.35) inset, 0 0 24px var(--glow);
+    pointer-events:none;
+    transition: transform 120ms ease;
+  }
+  .pill{
+    padding:6px 10px; border-radius:10px; background:var(--pill); border:1px solid rgba(127,184,255,.45);
+    color:#dff0ff; font-weight:750; min-width:70px; display:inline-flex; align-items:center; justify-content:center;
+  }
+  .ico{ font-size:14px; opacity:.95}
+  .sun{ color:#ffd66e}
+  .moon{ color:#a8c0ff}
+
+  /* utilities */
+  .muted{ color:var(--muted)}
+  .sr{ position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); border:0;}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1 id="titleDate">—</h1>
+      <p class="sub">Center column shows the exact current minute. Offsets are relative to Singapore. All text uses Aptos.</p>
+    </header>
+
+    <section class="cards" id="cards"></section>
+
+    <div class="legend">
+      <span class="dot day"></span><span class="muted">Daytime</span>
+      <span class="dot night"></span><span class="muted">Nighttime</span>
+    </div>
+
+    <section class="grid" id="grid">
+      <!-- header row + data rows injected via JS -->
+    </section>
+  </div>
+
+<script>
+/* ======= CONFIG ======= */
+const CITIES = [
+  { name:"Boise",     tz:"America/Boise",     img:"BOISE.png" },
+  { name:"Houston",   tz:"America/Chicago",   img:"HOUSTON.png" },
+  { name:"New York",  tz:"America/New_York",  img:"NYC.png" },
+  { name:"London",    tz:"Europe/London",     img:"LONDON.png" },
+  { name:"Helsinki",  tz:"Europe/Helsinki",   img:"HELSINKI.png" },
+  { name:"UAE",       tz:"Asia/Dubai",        img:"UAE.png" },
+  { name:"Singapore", tz:"Asia/Singapore",    img:"SINGAPORE.png" }
+];
+const SG_TZ = "Asia/Singapore";
+const COLS = 13;              // 6 left + center + 6 right
+const HALF = (COLS-1)/2;      // 6
+const CELL_MINS_FOR_ICON = 60;// day/night rough icon (look at hour)
+
+/* ======= HELPERS ======= */
+const fmtDateLong = (d, tz) =>
+  new Intl.DateTimeFormat('en-GB',{ timeZone: tz, day:'2-digit', month:'long', year:'numeric' }).format(d);
+
+const fmtTime12 = (d, tz) => {
+  // Return {hhmm, ampm} like "6:29", "am"
+  const p = new Intl.DateTimeFormat('en-GB',
+    { timeZone: tz, hour:'numeric', minute:'2-digit', hour12:true }
+  ).formatToParts(d);
+  const hh = p.find(x=>x.type==='hour')?.value ?? '';
+  const mm = p.find(x=>x.type==='minute')?.value ?? '';
+  const dp = p.find(x=>x.type==='dayPeriod')?.value?.toLowerCase() ?? '';
+  return { hhmm: `${hh}:${mm}`, ampm: dp };
+};
+
+const fmtTime12Short = (d, tz) => {
+  // "6:29 am"
+  const {hhmm, ampm} = fmtTime12(d, tz);
+  return `${hhmm} ${ampm}`;
+};
+
+function getGMTOffsetHours(tz, when=new Date()){
+  // Parse "GMT+8" from timeZoneName
+  const parts = new Intl.DateTimeFormat('en-US',{
+    timeZone: tz,
+    timeZoneName:'short'
+  }).formatToParts(when);
+  const tzn = parts.find(x=>x.type==='timeZoneName')?.value || '';
+  const m = tzn.match(/GMT([+-]\d{1,2})(?::(\d{2}))?/i);
+  if(!m) return NaN;
+  const h = parseInt(m[1],10);
+  const mins = m[2]? parseInt(m[2],10) : 0;
+  return h + (mins/60) ;
+}
+
+function offsetVsSingaporeHours(tz, when=new Date()){
+  const sg = getGMTOffsetHours(SG_TZ, when);
+  const ct = getGMTOffsetHours(tz, when);
+  const diff = ct - sg; // negative => behind Singapore
+  // keep within -12..+12 visually
+  if (diff > 12) return diff - 24;
+  if (diff < -12) return diff + 24;
+  return diff;
+}
+
+/* Day/Night rough icon from hour */
+function isDay(d, tz){
+  const hr = Number(new Intl.DateTimeFormat('en-US',{ timeZone: tz, hour:'2-digit', hour12:false }).format(d));
+  return hr >= 6 && hr < 18; // simple heuristic
+}
+
+/* Build a date that equals "Singapore now" +/- hours, then view in another TZ */
+function addHours(base, h){
+  const nd = new Date(base.getTime());
+  nd.setHours(nd.getHours()+h);
+  return nd;
+}
+
+/* ======= RENDER ======= */
+function render(){
+  const now = new Date();
+
+  // Title date in Singapore (full)
+  document.getElementById('titleDate').textContent = fmtDateLong(now, SG_TZ);
+
+  // Build Cards
+  const cards = document.getElementById('cards');
+  cards.innerHTML = '';
+  const sgOffset = getGMTOffsetHours(SG_TZ, now);
+
+  CITIES.forEach(city=>{
+    const art = city.img;
+    const {hhmm, ampm} = fmtTime12(now, city.tz);
+    const rel = offsetVsSingaporeHours(city.tz, now);
+    const aheadBehind = rel === 0 ? "same as Singapore"
+      : `${Math.abs(rel)} ${Math.abs(rel)===1?'hour':'hours'} ${rel>0?'ahead of':'behind'} Singapore`;
+
+    const card = document.createElement('article');
+    card.className = 'card';
+    card.innerHTML = `
+      <div class="art" style="background-image:url('${art}')"></div>
+      <div class="shade"></div>
+      <div class="in">
+        <div class="city">${city.name}</div>
+        <div class="big">
+          <div class="time">${hhmm}</div>
+          <div class="ampm">${ampm}</div>
+        </div>
+        <div class="offset">${aheadBehind}</div>
+        <div class="date">${fmtDateLong(now, city.tz)}</div>
+      </div>
+    `;
+    cards.appendChild(card);
+  });
+
+  // Build Grid
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+
+  // Header row
+  const head = document.createElement('div');
+  head.className = 'row head';
+  const headCols = [];
+
+  // First cell label
+  const h0 = document.createElement('div');
+  h0.className = 'cell';
+  h0.innerHTML = `<span class="label"><span class="lbl-icon">⏱️</span><span>Timeline</span><span class="muted">Singapore reference</span></span>`;
+  head.appendChild(h0);
+
+  // Compute column widths later for highlight
+  // Create 13 headings centered at current minute SG time
+  const sgNow = new Date(now.getTime()); // reference
+  for(let c=-HALF; c<=HALF; c++){
+    const d = addHours(sgNow, c);
+    const cell = document.createElement('div');
+    cell.className = 'cell';
+    cell.dataset.col = (c+HALF); // 0..12
+    cell.textContent = fmtTime12Short(d, SG_TZ);
+    headCols.push(cell);
+    head.appendChild(cell);
+  }
+
+  // attach and compute col width for highlight
+  grid.appendChild(head);
+
+  // Highlight element
+  const hi = document.createElement('div');
+  hi.className = 'col-highlight';
+  head.appendChild(hi);
+  // place highlight over center column
+  requestAnimationFrame(()=>{
+    const center = headCols[HALF];
+    if(center){
+      const rHead = head.getBoundingClientRect();
+      const r = center.getBoundingClientRect();
+      const w = r.width;
+      head.style.setProperty('--colW', w+'px');
+      const x = (r.left - rHead.left);
+      hi.style.transform = `translateX(${x}px)`;
+    }
+  });
+
+  // Data rows (one per city)
+  CITIES.forEach(city=>{
+    const row = document.createElement('div');
+    row.className = 'row';
+
+    // Row label
+    const first = document.createElement('div');
+    first.className = 'cell';
+    first.innerHTML = `<span class="label"><span class="lbl-icon">🌐</span>${city.name}</span>`;
+    row.appendChild(first);
+
+    // 13 time cells, relative to SG reference minute
+    for(let c=-HALF; c<=HALF; c++){
+      const d = addHours(sgNow, c);         // still the exact minute
+      const localIsDay = isDay(d, city.tz);
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      cell.innerHTML = `
+        <span class="ico ${localIsDay?'sun':'moon'}">${localIsDay?'☀️':'🌙'}</span>
+        <span>${fmtTime12Short(d, city.tz)}</span>
+      `;
+
+      // Center column gets a pill to echo the Windows feel
+      if(c===0){
+        cell.innerHTML = `<span class="pill">${fmtTime12Short(d, city.tz)}</span>`;
+      }
+      row.appendChild(cell);
+    }
+    grid.appendChild(row);
+  });
+}
+
+/* Update every 20s to keep the minute fresh (lightweight) */
+render();
+setInterval(render, 20000);
+</script>
+</body>
+</html>
