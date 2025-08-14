@@ -11,6 +11,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+// View engine (EJS) for optional server-side rendering
+app.set("views", path.join(__dirname, "..", "views"));
+app.set("view engine", "ejs");
 
 // --- Config ---
 const PORT = process.env.PORT || 3000;
@@ -131,9 +134,13 @@ app.get(
 );
 
 // (optional) SSR route placeholder if you want server-side cards later
-// app.get("/", (req, res) => {
-//   res.render("index.ejs", { /* preloaded data here */ });
-// });
+app.get("/", (req, res) => {
+  res.render("index", {
+    title: "Timezone Dashboard",
+    content: "",
+    data: {},
+  });
+});
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT} (${NODE_ENV})`);
